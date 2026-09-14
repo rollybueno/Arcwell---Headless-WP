@@ -1,0 +1,7 @@
+<?xml version="1.0"?>
+<ruleset name="Arcwell">
+  <description>PSR-12 PHP style; long WordPress hook/configuration expressions are permitted.</description>
+  <file>src</file>
+  <arg name="extensions" value="php"/>
+  <rule ref="PSR12"><exclude name="Generic.Files.LineLength"/></rule>
+</ruleset>

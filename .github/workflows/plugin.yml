@@ -1,0 +1,32 @@
+name: Arcwell plugin checks
+on:
+  push:
+    paths: ['wordpress/wp-content/plugins/arcwell-core/**', 'packages/arcwell-contract/**', 'scripts/build-plugin.py', '.github/workflows/plugin.yml']
+  pull_request:
+    paths: ['wordpress/wp-content/plugins/arcwell-core/**', 'packages/arcwell-contract/**', 'scripts/build-plugin.py', '.github/workflows/plugin.yml']
+jobs:
+  static-and-contract:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: shivammathur/setup-php@v2
+        with:
+          php-version: '8.2'
+          extensions: mbstring, dom, xml
+          tools: composer:v2
+          coverage: none
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - run: composer install --no-interaction --prefer-dist
+        working-directory: wordpress/wp-content/plugins/arcwell-core
+      - run: vendor/bin/phpunit tests/Unit
+        working-directory: wordpress/wp-content/plugins/arcwell-core
+      - run: composer lint && composer analyse
+        working-directory: wordpress/wp-content/plugins/arcwell-core
+      - run: node --test packages/arcwell-contract/server.test.mjs
+      - run: python3 scripts/build-plugin.py
+      - uses: actions/upload-artifact@v4
+        with:
+          name: arcwell-core
+          path: dist/arcwell-core-*.zip*

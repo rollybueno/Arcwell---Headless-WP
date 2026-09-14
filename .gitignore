@@ -1,0 +1,51 @@
+# Local WordPress instances, databases and browser fixtures.
+/.runtime/
+
+# Dependencies (keep package manifests and lockfiles).
+/vendor/
+**/vendor/
+node_modules/
+
+# Generated release packages and frontend builds.
+/dist/
+.next/
+out/
+
+# Test, analysis and language caches.
+.phpunit.cache/
+.phpunit.result.cache
+phpstan-tmp/
+coverage/
+playwright-report/
+test-results/
+/wordpress/wp-content/plugins/arcwell-core/tests/results/
+__pycache__/
+*.py[cod]
+
+# Environment secrets and machine-specific configuration.
+.env
+.env.*
+!.env.example
+!.env.*.example
+wp-config.php
+auth.json
+*.sql
+*.sql.gz
+*.log
+
+# WordPress runtime content; only the companion plugin belongs here.
+/wordpress/*
+!/wordpress/wp-content/
+/wordpress/wp-content/*
+!/wordpress/wp-content/plugins/
+/wordpress/wp-content/plugins/*
+!/wordpress/wp-content/plugins/arcwell-core/
+
+# Editor and operating-system files.
+.idea/
+.vscode/
+.DS_Store
+Thumbs.db
+*.swp
+*.swo
+*~

@@ -1,0 +1,4 @@
+<?xml version="1.0"?>
+<phpunit bootstrap="tests/bootstrap.php" colors="true" cacheDirectory=".phpunit.cache" failOnWarning="true">
+  <testsuites><testsuite name="Arcwell"><directory>tests/Unit</directory><directory>tests/Integration</directory></testsuite></testsuites>
+</phpunit>

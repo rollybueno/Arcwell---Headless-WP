@@ -1,0 +1,11 @@
+parameters:
+    level: 3
+    paths:
+        - src
+    scanFiles:
+        - vendor/php-stubs/wordpress-stubs/wordpress-stubs.php
+        - tests/static-stubs.php
+    tmpDir: phpstan-tmp
+    treatPhpDocTypesAsCertain: false
+    dynamicConstantNames:
+        - ABSPATH

@@ -224,7 +224,7 @@ The systems remain independently deployable.
 │  ├── Revisions / Autosaves                                  │
 │  └── Editorial permissions                                  │
 │                                                             │
-│  Headless Publishing Core Plugin                            │
+│  Arcwell Core Plugin                                        │
 │  ├── Content model                                          │
 │  ├── GraphQL extensions                                     │
 │  ├── Preview URL handling                                   │
@@ -263,9 +263,9 @@ The systems remain independently deployable.
 │  └── Search                                                 │
 │                                                             │
 │  Route Handlers                                             │
-│  ├── /api/preview                                           │
-│  ├── /api/preview/exit                                      │
-│  └── /api/revalidate                                        │
+│  ├── /api/arcwell/preview                                   │
+│  ├── /api/arcwell/preview/exit                              │
+│  └── /api/arcwell/revalidate                                │
 │                                                             │
 │  Cache                                                      │
 │  ├── post:{id}                                              │
@@ -512,7 +512,7 @@ arcwell/
 │       │   └── headless-loader.php
 │       │
 │       └── plugins/
-│           └── headless-publishing-core/
+│           └── arcwell-core/
 │               ├── src/
 │               │   ├── Content/
 │               │   ├── GraphQL/
@@ -521,7 +521,7 @@ arcwell/
 │               │   ├── REST/
 │               │   └── URLs/
 │               ├── tests/
-│               └── headless-publishing-core.php
+│               └── arcwell-core.php
 │
 ├── packages/
 │   └── graphql/
@@ -580,18 +580,20 @@ Frontend routing
 
 ---
 
-# 10. Headless Publishing Core Plugin
+# 10. Arcwell Core Plugin
+
+The implementation contract is [Arcwell Core WordPress Plugin Specification](plugin/arcwell-core-plugin-spec.md). It defines the precise editorial fields, GraphQL extensions, preview claims, webhook payload, permissions, and release gates. Architecture examples below are illustrative; use that shared versioned contract when implementing PHP and TypeScript.
 
 A custom WordPress plugin acts as the integration layer.
 
 Suggested plugin name:
 
-**Headless Publishing Core**
+**Arcwell Core**
 
 Responsibilities:
 
 ```text
-Headless Publishing Core
+Arcwell Core
 
 ├── Content
 │   ├── Register Series
@@ -647,8 +649,8 @@ A topic taxonomy can represent long-running editorial subjects independent of a 
 Example:
 
 ```text
-Category: Development
-Topic: WordPress Core
+Category: Design
+Topic: Architecture
 ```
 
 ### Series
@@ -846,10 +848,14 @@ Initial public routes:
 /
 /articles/
 /articles/[slug]/
+/topics/
 /topics/[slug]/
+/series/
 /series/[slug]/
+/authors/
 /authors/[slug]/
 /category/[slug]/
+/tags/[slug]/
 /search/
 /about/
 ```
@@ -894,7 +900,7 @@ Featured Series
 [ Modern Publishing ]
 ```
 
-Next.js consumes this configuration and owns visual rendering.
+Next.js consumes this configuration and owns visual rendering. Store the structured homepage configuration as revisionable metadata on the designated front Page, not ordinary options. The plugin spec defines copy fields, ordered selections, publication filtering, and empty-selection fallbacks. Site-wide settings and menus remain separate, saved-immediate configuration.
 
 ---
 
@@ -1006,26 +1012,7 @@ PURGE EVERYTHING
 
 Instead WordPress sends enough information for the frontend to determine affected dependencies.
 
-Example webhook payload:
-
-```json
-{
-  "event": "post.updated",
-  "timestamp": 1789344000,
-  "entity": {
-    "type": "post",
-    "id": 123,
-    "slug": "headless-wordpress",
-    "uri": "/articles/headless-wordpress/"
-  },
-  "relationships": {
-    "authors": [8],
-    "topics": [14],
-    "categories": [5],
-    "series": [3]
-  }
-}
-```
+The canonical versioned event contract is defined in the plugin specification, section 13. Include a stable event ID, environment-specific source ID, typed entity identity, previous/current public URLs and relationships, and the union of affected public dependencies. Capturing both old and new state is required for slug changes, author/topic reassignment, and deletion. The plugin describes semantic dependencies; Next.js maps them to cache tags and paths.
 
 Possible invalidations:
 
@@ -1157,7 +1144,7 @@ Affected article caches may also need invalidation when the taxonomy label or me
 WordPress sends revalidation events to:
 
 ```text
-POST https://www.example.com/api/revalidate
+POST https://www.example.com/api/arcwell/revalidate
 ```
 
 Do not use an unauthenticated endpoint or a secret in a query string.
@@ -1165,8 +1152,8 @@ Do not use an unauthenticated endpoint or a secret in a query string.
 Recommended headers:
 
 ```http
-X-Webhook-Timestamp: 1789344000
-X-Webhook-Signature: sha256=<signature>
+X-Arcwell-Timestamp: 1789344000
+X-Arcwell-Signature: sha256=<signature>
 ```
 
 Signature concept:
@@ -1174,7 +1161,7 @@ Signature concept:
 ```text
 HMAC_SHA256(
     timestamp + "." + raw_request_body,
-    REVALIDATION_SECRET
+    ARCWELL_WEBHOOK_SECRET
 )
 ```
 
@@ -1219,9 +1206,9 @@ Possible webhook log:
 
 ```text
 Event                     Status
-post.updated:123          success
-post.updated:455          failed
-post.updated:891          retrying
+content.updated:123       success
+content.updated:455       failed
+content.updated:891       retrying
 ```
 
 Example retry policy:
@@ -1233,10 +1220,12 @@ Attempt 2
 ↓ 2 minutes
 Attempt 3
 ↓ 10 minutes
+Attempt 4
+↓
 Final failure
 ```
 
-Retry handling can be deferred until a post-MVP release while keeping the webhook service structured for it.
+For client delivery, bounded retries, durable event storage, failure diagnostics, and a reliable scheduled worker are required in v1. WP-Cron must be driven by host/system scheduling or an equivalent worker so CMS traffic is not required for delivery. See the plugin specification for the queue and retry contract.
 
 ---
 
@@ -1253,7 +1242,7 @@ WordPress editor
       │
       │ Preview
       ▼
-Next.js /api/preview
+Next.js /api/arcwell/preview
       │
       ├── Verify signed request
       ├── Determine content ID
@@ -1324,12 +1313,13 @@ signature
 Next.js verifies:
 
 ```text
-signature
-expiry
-content identifier
+signature and token version
+expiry and issue time
+content identifier and preview mode
+expected source and frontend audience
 ```
 
-before enabling Draft Mode.
+before enabling Draft Mode. Draft Mode alone does not authorize unpublished access; maintain a separate expiring preview session scoped to the signed content and mode, and clear both on exit.
 
 The redirect destination should be derived from trusted CMS data rather than blindly accepting a user-supplied redirect URL.
 
@@ -1340,10 +1330,10 @@ The redirect destination should be derived from trusted CMS data rather than bli
 Provide:
 
 ```text
-/api/preview/exit
+/api/arcwell/preview/exit
 ```
 
-The route disables Draft Mode and redirects to the canonical public page.
+The route disables Draft Mode and clears the scoped preview session. It redirects to the canonical public page when published, or to a safe published destination for an unpublished draft.
 
 Preview requests should never populate or reuse normal public content cache entries.
 
@@ -1646,9 +1636,10 @@ Frontend: www.example.com
 Each environment receives unique values for:
 
 ```text
-FRONTEND_URL
-PREVIEW_SECRET
-REVALIDATION_SECRET
+ARCWELL_FRONTEND_URL
+ARCWELL_PREVIEW_SECRET
+ARCWELL_WEBHOOK_SECRET
+ARCWELL_SOURCE_ID
 WP_PREVIEW_USERNAME
 WP_PREVIEW_APP_PASSWORD
 ```
@@ -1709,8 +1700,9 @@ WORDPRESS_GRAPHQL_URL
 WP_PREVIEW_USERNAME
 WP_PREVIEW_APP_PASSWORD
 
-PREVIEW_SECRET
-REVALIDATION_SECRET
+ARCWELL_PREVIEW_SECRET
+ARCWELL_WEBHOOK_SECRET
+ARCWELL_SOURCE_ID
 
 NEXT_PUBLIC_SITE_URL
 ```
@@ -1900,7 +1892,7 @@ Version 1 includes:
 
 - WordPress CMS
 - WPGraphQL
-- custom Headless Publishing Core plugin
+- custom Arcwell Core plugin
 - Next.js App Router frontend
 - TypeScript
 - posts
@@ -2176,7 +2168,7 @@ Eleven linked pages cover the homepage, journal, topics, article, author, series
 - detect publish/update/delete events
 - build webhook payload
 - sign webhook requests
-- implement `/api/revalidate`
+- implement `/api/arcwell/revalidate`
 - add cache tags
 - implement dependency-aware invalidation
 
