@@ -1,22 +1,16 @@
-# Arcwell Core 0.1.0
+# Arcwell Core 0.1.2
 
 WordPress companion for the Arcwell headless frontend. Runtime PHP has no Composer dependencies. WordPress owns editorial content; WPGraphQL supplies native content queries. Arcwell adds presentation metadata, curated relationships, preview signing and publishing events.
+
+## Configuration reference
+
+See [the complete configuration guide](docs/configuration.md) for every constant/environment variable, copyable setup examples, secret generation, precedence, local development and troubleshooting. The same essentials are available directly in Settings → Arcwell.
 
 ## Installation
 
 1. Use PHP 8.2+ and WordPress 6.4+. Install and activate **WPGraphQL 2.22.3+** first. This release was integration-tested on WordPress 7.1, WPGraphQL 2.22.3, PHP 8.2 and MySQL 8.0; the minimum WordPress version has not yet been integration-tested.
-2. Upload `dist/arcwell-core-0.1.0.zip` through WordPress Plugins, or copy `arcwell-core/` into `wp-content/plugins/`. Activate Arcwell Core.
-3. Add the following before the end of `wp-config.php`, using deployment secrets rather than committing values:
-
-```php
-define('ARCWELL_FRONTEND_URL', 'https://www.example.com');
-define('ARCWELL_SOURCE_ID', 'arcwell-production-unique-id');
-define('ARCWELL_PREVIEW_SECRET', getenv('ARCWELL_PREVIEW_SECRET'));
-define('ARCWELL_WEBHOOK_SECRET', getenv('ARCWELL_WEBHOOK_SECRET'));
-define('ARCWELL_ENVIRONMENT', 'production');
-```
-
-Use independent random secrets of at least 32 bytes. The source identifies one CMS environment; staging must have a different source, origin and secrets. Constants or environment variables are supported. The origin must have no path, query or credentials. HTTP is accepted only when WordPress's environment type is `local` or `development`.
+2. Upload `dist/arcwell-core-0.1.2.zip` through WordPress Plugins, or copy `arcwell-core/` into `wp-content/plugins/`. Activate Arcwell Core.
+3. Open **Settings → Arcwell**. Enter the frontend website address and use **Generate ID** and **Generate key** to fill the connection fields. Save, then copy the identity and both keys to your frontend hosting configuration. No code is needed for WordPress setup. See [configuration.md](docs/configuration.md) for storage, copy/reveal controls and optional hosting overrides.
 
 4. Create a Page and select it under Settings → Reading → A static page. Its Gutenberg sidebar now contains homepage controls. Create Topics and Series, and select ordered content through the sidebar controls. A Page's Arcwell presentation can select the About layout and value entries. Edit category/Topic images, author specialty and attachment credits in their native WordPress screens.
 5. Configure site presentation under Settings → Arcwell, assign native navigation menus, and review readiness checks.
@@ -45,6 +39,7 @@ From this plugin directory:
 ```sh
 composer install
 composer test
+php tests/connection-settings.php
 composer lint
 composer analyse
 ```

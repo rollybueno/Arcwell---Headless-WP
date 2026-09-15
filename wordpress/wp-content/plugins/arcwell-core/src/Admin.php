@@ -11,6 +11,8 @@ final class Admin
     }
     public function hooks(): void
     {
+        add_action('admin_post_arcwell_connection', [$this, 'saveConnection']);
+        add_action('wp_ajax_arcwell_reveal_key', [$this, 'revealKey']);
         add_action('admin_menu', function (): void {
             add_options_page('Arcwell', 'Arcwell', 'manage_options', 'arcwell', [$this, 'page']);
         });
@@ -23,7 +25,7 @@ final class Admin
             }]);
         });
         add_action('admin_notices', static function (): void {
-            if (current_user_can('manage_options') && (!Config::graphqlReady() || get_option('arcwell_queue_error'))) {
+            if (get_current_screen()?->id !== 'settings_page_arcwell' && current_user_can('manage_options') && (!Config::graphqlReady() || get_option('arcwell_queue_error'))) {
                 echo '<div class="notice notice-warning"><p>' . esc_html__('Arcwell needs attention. Check Settings → Arcwell for dependency and delivery diagnostics.', 'arcwell-core') . '</p></div>';
             }
         });
@@ -75,19 +77,71 @@ final class Admin
         }
         $settings = (array) get_option('arcwell_site', []);
         $data = $this->queue->diagnostics();
-        echo '<div class="wrap arcwell-admin"><h1>Arcwell</h1><p>WordPress editorial content and frontend publishing integration.</p><h2>Readiness</h2><ul>';
-        foreach ($data['checks'] as $key => $ok) {
-            echo '<li><strong>' . esc_html($ok ? 'Ready' : 'Needs configuration') . '</strong> — ' . esc_html(str_replace('_', ' ', $key)) . '</li>';
-        }
-        echo '</ul><p>Secrets and destination are configured by your host in wp-config.php or environment variables. Secrets are never displayed here.</p><h2>Publication settings</h2><p>These settings update immediately. Edit the front Page to preview homepage content and selections.</p><form method="post" action="options.php">';
-        settings_fields('arcwell');
-        foreach (['tagline' => 'Publication tagline', 'foundingYear' => 'Founding year', 'issueLabel' => 'Optional issue label'] as $key => $label) {
-            echo '<p><label>' . esc_html($label) . '<br><input class="regular-text" name="arcwell_site[' . esc_attr($key) . ']" value="' . esc_attr((string) ($settings[$key] ?? '')) . '"></label></p>';
-        }
-        submit_button();
-        echo '</form><h2>Delivery diagnostics</h2><p>Worker last run: ' . esc_html($data['workerLastRun'] ? gmdate('Y-m-d H:i:s', $data['workerLastRun']) . ' UTC' : 'Never — configure system cron') . '</p>';
-        echo '<p><button class="button button-primary" id="arcwell-test">Queue connection test</button> <button class="button" id="arcwell-refresh">Refresh deliveries</button></p><p id="arcwell-status" role="status"></p><div id="arcwell-deliveries"></div></div>';
+        require dirname(__DIR__) . '/views/settings.php';
     }
+
+    public function revealKey(): void
+    {
+        if (!current_user_can('manage_options')) {
+            wp_send_json_error(['message' => 'Administrator access required.'], 403);
+            return;
+        }
+        check_ajax_referer('arcwell_connection', 'nonce');
+        nocache_headers();
+        if (($_SERVER['REQUEST_METHOD'] ?? '') !== 'POST') {
+            wp_send_json_error(['message' => 'Use POST.'], 405);
+            return;
+        }
+        $key = sanitize_text_field(wp_unslash($_POST['key'] ?? ''));
+        if (!in_array($key, ['ARCWELL_PREVIEW_SECRET', 'ARCWELL_WEBHOOK_SECRET'], true) || Config::managed($key)) {
+            wp_send_json_error(['message' => 'This key is managed by your host.'], 400);
+            return;
+        }
+        wp_send_json_success(['value' => Config::value($key)]);
+    }
+    public function saveConnection(): void
+    {
+        if (!current_user_can('manage_options')) {
+            wp_die('Administrator access required.', '', ['response' => 403]);
+        }
+        check_admin_referer('arcwell_connection');
+        $input = isset($_POST['connection']) && is_array($_POST['connection']) ? wp_unslash($_POST['connection']) : [];
+        $values = (array) get_option('arcwell_connection', []);
+        $error = '';
+        foreach (Config::FIELDS as $key) {
+            if (Config::managed($key)) {
+                continue;
+            }
+            if (!array_key_exists($key, $input)) {
+                continue;
+            }
+            $value = isset($input[$key]) && is_string($input[$key]) ? trim($input[$key]) : '';
+            if (str_ends_with($key, '_SECRET') && $value === '') {
+                continue; // A blank password field preserves the saved key.
+            }
+            if ($key === 'ARCWELL_FRONTEND_URL' && !Config::validateOrigin($value)) {
+                $error = 'Enter a valid website address, such as https://www.example.com, without a page path.';
+            } elseif ($key === 'ARCWELL_SOURCE_ID' && !preg_match('/^[a-zA-Z0-9_-]{8,100}$/D', $value)) {
+                $error = 'Use Generate ID to create a valid website identity.';
+            } elseif (str_ends_with($key, '_SECRET') && (strlen($value) < 32 || strlen($value) > 512 || preg_match('/[^\x21-\x7e]/', $value))) {
+                $error = 'Use Generate key to create a valid security key (32–512 printable characters, without spaces).';
+            } elseif ($key === 'ARCWELL_ENVIRONMENT' && strlen($value) > 100) {
+                $error = 'Keep the environment label under 100 characters.';
+            }
+            $values[$key] = $value;
+        }
+        $effective = static fn ($key) => Config::managed($key) ? Config::value($key) : ($values[$key] ?? '');
+        if ($effective('ARCWELL_PREVIEW_SECRET') !== '' && $effective('ARCWELL_PREVIEW_SECRET') === $effective('ARCWELL_WEBHOOK_SECRET')) {
+            $error = 'Generate a different key for each security field.';
+        }
+        if (!$error) {
+            update_option('arcwell_connection', $values, false);
+        }
+        set_transient('arcwell_setup_notice_' . get_current_user_id(), $error ?: 'Connection settings saved. Complete any remaining steps, then test your connection.', 60);
+        wp_safe_redirect(admin_url('options-general.php?page=arcwell'));
+        exit;
+    }
+
     public function termFields(?\WP_Term $term): void
     {
         $id = $term ? (int) $term->term_id : 0;

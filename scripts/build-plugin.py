@@ -11,7 +11,7 @@ version = re.search(r'\* Version: ([\d.]+)', (plugin / 'arcwell-core.php').read_
 output = root / 'dist' / f'arcwell-core-{version}.zip'
 output.parent.mkdir(exist_ok=True)
 files = [plugin / name for name in ('arcwell-core.php', 'readme.txt', 'README.md', 'LICENSE')]
-files += [p for folder in ('src', 'assets', 'docs') for p in (plugin / folder).rglob('*') if p.is_file()]
+files += [p for folder in ('src', 'assets', 'docs', 'views') for p in (plugin / folder).rglob('*') if p.is_file()]
 with ZipFile(output, 'w', ZIP_DEFLATED) as archive:
     for path in sorted(files):
         info = ZipInfo('arcwell-core/' + path.relative_to(plugin).as_posix(), date_time=(2026, 1, 1, 0, 0, 0))

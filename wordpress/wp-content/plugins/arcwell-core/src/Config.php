@@ -7,14 +7,26 @@ namespace Arcwell\Core;
 final class Config
 {
     public const GRAPHQL_MIN = '2.22.3';
+    public const FIELDS = ['ARCWELL_FRONTEND_URL', 'ARCWELL_SOURCE_ID', 'ARCWELL_PREVIEW_SECRET', 'ARCWELL_WEBHOOK_SECRET', 'ARCWELL_ENVIRONMENT'];
+    public static function managed(string $name): bool
+    {
+        return defined($name) || getenv($name) !== false;
+    }
     public static function value(string $name): string
     {
         $value = defined($name) ? constant($name) : getenv($name);
+        if (!self::managed($name) && in_array($name, self::FIELDS, true)) {
+            $value = ((array) get_option('arcwell_connection', []))[$name] ?? '';
+        }
         return is_string($value) ? trim($value) : '';
     }
     public static function origin(): string
     {
-        $value = rtrim(self::value('ARCWELL_FRONTEND_URL'), '/');
+        return self::validateOrigin(self::value('ARCWELL_FRONTEND_URL'));
+    }
+    public static function validateOrigin(string $value): string
+    {
+        $value = rtrim(trim($value), '/');
         $url = wp_parse_url($value);
         if (
             !$url || empty($url['host']) || !in_array($url['scheme'] ?? '', ['https', 'http'], true)

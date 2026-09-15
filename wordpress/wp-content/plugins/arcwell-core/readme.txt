@@ -3,7 +3,7 @@ Contributors: arcwell
 Requires at least: 6.4
 Requires PHP: 8.2
 Tested up to: 7.1
-Stable tag: 0.1.0
+Stable tag: 0.1.2
 License: GPLv2 or later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
 
@@ -17,10 +17,14 @@ No Composer dependencies are needed in production. See README.md for configurati
 == Installation ==
 1. Install and activate WPGraphQL 2.22.3 or later.
 2. Upload this ZIP using Plugins > Add New > Upload Plugin, then activate.
-3. Configure the ARCWELL constants in wp-config.php; see README.md.
+3. Open Settings > Arcwell and complete the connection form; generate and copy the security keys.
 4. Select a static homepage and open Settings > Arcwell.
 5. Configure a system cron worker and integrate the frontend contract.
 
 == Changelog ==
+= 0.1.2 =
+Guided connection form with secure generation, copy/reveal controls and protected hosting overrides.
+= 0.1.2 =
+Improved settings dashboard and embedded configuration documentation.
 = 0.1.0 =
 Initial WordPress companion plugin implementation.

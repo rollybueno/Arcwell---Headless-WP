@@ -1,0 +1,1 @@
+export default function NotFound(){return <main id="main" className="wrap not-found"><span className="code">404</span><h1>A little off the beaten path.</h1><p>This story may have moved, or the page is no longer available.</p><a className="button" href="/journal/">Back to the journal ↗</a></main>;}
